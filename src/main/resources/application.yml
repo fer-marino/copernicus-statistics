@@ -1,0 +1,26 @@
+# ===============================
+# = DATA SOURCE
+# ===============================
+# Set here configurations for the database connection
+spring.data.cassandra:
+  keyspace-name: wamp_keyspace
+  contact-points: localhost
+  port: 9042
+  schema-action: create_if_not_exists
+
+#spring.main.web-environment: false
+spring.data.rest:
+  base-path: /api
+  max-page-size: 100
+  default-page-size: 100
+
+spring.jackson.serialization.write_dates_as_timestamps: false
+
+wamp:
+  dhusId: Scihub
+  dhusUser: test
+  dhusPassword: test
+  dhusUrl: https://scihub.copernicus.eu/dhus/
+  pollInterval: 6h
+
+
