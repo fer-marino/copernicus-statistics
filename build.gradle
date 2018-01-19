@@ -1,23 +1,28 @@
 buildscript {
 	ext {
-		kotlinVersion = '1.2.20'
-		springBootVersion = '1.5.9.RELEASE'
+		kotlinVersion = '1.1.61'
+		springBootVersion = '2.0.0.M7'
 		camelVersion = '2.20.1'
 	}
 	repositories {
 		mavenCentral()
+        maven { url "https://repo.spring.io/snapshot" }
+        maven { url "https://repo.spring.io/milestone" }
 	}
 	dependencies {
 		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
 		classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
-		classpath("org.jetbrains.kotlin:kotlin-allopen:${kotlinVersion}")
+		classpath "org.jetbrains.kotlin:kotlin-allopen:${kotlinVersion}"
+        classpath "org.jetbrains.kotlin:kotlin-noarg:$kotlinVersion"
 	}
 }
 
 apply plugin: 'kotlin'
 apply plugin: 'kotlin-spring'
+apply plugin: "kotlin-noarg"
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
 
 group = 'com.serco.sentinel1'
 version = '0.0.1-SNAPSHOT'
@@ -32,11 +37,14 @@ compileTestKotlin {
 
 repositories {
 	mavenCentral()
+    maven { url "https://repo.spring.io/snapshot" }
+    maven { url "https://repo.spring.io/milestone" }
+    maven { url "https://repository.apache.org/content/repositories/snapshots/" }
 }
 
 dependencies {
     // spring dependencies
-    compile('org.springframework.boot:spring-boot-starter-data-cassandra')
+    compile('org.springframework.boot:spring-boot-starter-data-elasticsearch')
     compile('org.springframework.boot:spring-boot-starter-data-rest')
 
     // kotlin dependencies
@@ -45,11 +53,13 @@ dependencies {
 	compile("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // camel dependencies
-    compile("org.apache.camel:camel-spring-boot-starter:$camelVersion")
+//    compile("org.apache.camel:camel-spring-boot-starter:$camelVersion")
     compile("org.apache.camel:camel-jackson:${camelVersion}")
     compile("org.apache.camel:camel-http:${camelVersion}")
 
     compile('com.fasterxml.jackson.datatype:jackson-datatype-jsr310')
+//    compile('com.fasterxml.jackson.datatype:jackson-datatype-jdk8')
+
 
     // test
 	testCompile('org.springframework.boot:spring-boot-starter-test')

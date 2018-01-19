@@ -2,11 +2,11 @@
 # = DATA SOURCE
 # ===============================
 # Set here configurations for the database connection
-spring.data.cassandra:
-  keyspace-name: wamp_keyspace
-  contact-points: localhost
-  port: 9042
-  schema-action: create_if_not_exists
+
+spring.data.elasticsearch:
+  cluster-nodes: 127.0.0.1:9300
+
+
 
 #spring.main.web-environment: false
 spring.data.rest:
