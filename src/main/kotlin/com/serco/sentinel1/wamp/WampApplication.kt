@@ -13,6 +13,7 @@ class WampApplication {
 
     @PostConstruct
     fun postConstruct() {
+        // work around waiting for camel 2.21 with official support to spring boot 2
         val camelConfig = DefaultCamelContext()
         camelConfig.addRoutes(dhusPolling)
         camelConfig.start()

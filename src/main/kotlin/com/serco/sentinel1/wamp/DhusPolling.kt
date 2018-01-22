@@ -1,11 +1,13 @@
 package com.serco.sentinel1.wamp
 
+import com.serco.sentinel1.wamp.model.Product
+import com.serco.sentinel1.wamp.model.ProductRepository
 import org.apache.camel.Exchange
 import org.apache.camel.builder.RouteBuilder
 import org.apache.camel.component.jackson.ListJacksonDataFormat
 import org.elasticsearch.index.query.QueryBuilders.matchAllQuery
 import org.elasticsearch.search.aggregations.AggregationBuilders
-import org.elasticsearch.search.aggregations.metrics.max.InternalMax
+import org.elasticsearch.search.aggregations.metrics.max.Max
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate
@@ -64,7 +66,7 @@ class DhusPolling : RouteBuilder() {
                         val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
                         val p = Product(UUID.randomUUID(), productName, sdf.parse(productName.substring(17, 32)),
                                 sdf.parse(productName.substring(33, 48)), productName.substring(0, 3),
-                                productName.substring(56, 62), productName.substring(49, 55).toLong(),  productName.substring(4, 16),
+                                productName.substring(56, 62), productName.substring(49, 55).toLong(), productName.substring(4, 16),
                                 attributes["Timeliness Category"], productName.substring(63, 67),
                                 ingestionDate, attributes)
                         productRepository.save(p)
@@ -73,7 +75,7 @@ class DhusPolling : RouteBuilder() {
                     exchange.out = exchange.`in`.copy()
                     exchange.out.setHeader("productNumber", (exchange.`in`.body as List<Map<String, Any>>).size)
                 })
-                .log("Polling \${header.id} complete. Received \${header.productNumber} records")
+//                .log("Polling \${header.id} complete. Received \${header.productNumber} records")
                 .process({ exchange ->
                     exchange.out = exchange.`in`.copy()
                     exchange.out.body = null
@@ -96,7 +98,8 @@ class DhusPolling : RouteBuilder() {
 
                     var last = Date(0)
                     esTemplate.query(searchQuery, {
-                        last = Date((it.aggregations.first() as InternalMax).value.toLong())
+                        val value = it.aggregations.get<Max>("max_publication").value
+                        last = Date( if(value.isFinite()) value.toLong() else 0 )
                     })
 
 
