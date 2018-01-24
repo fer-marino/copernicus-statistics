@@ -3,7 +3,6 @@ buildscript {
 		kotlinVersion = '1.1.61'
 		springBootVersion = '2.0.0.M7'
 		camelVersion = '2.20.1'
-		querydslVersion = '4.1.4'
 	}
 	repositories {
 		mavenCentral()
@@ -58,8 +57,7 @@ dependencies {
     compile("org.apache.camel:camel-jackson:${camelVersion}")
     compile("org.apache.camel:camel-http:${camelVersion}")
 
-    compile('com.fasterxml.jackson.datatype:jackson-datatype-jsr310')
-//    compile('com.fasterxml.jackson.datatype:jackson-datatype-jdk8')
+//    compile('com.fasterxml.jackson.datatype:jackson-datatype-jsr310')
 
     // test
 	testCompile('org.springframework.boot:spring-boot-starter-test')

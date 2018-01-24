@@ -1,9 +1,13 @@
 package com.serco.sentinel1.wamp
 
+import com.serco.sentinel1.wamp.model.Product
 import org.apache.camel.impl.DefaultCamelContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.context.annotation.Configuration
+import org.springframework.data.rest.core.config.RepositoryRestConfiguration
+import org.springframework.data.rest.webmvc.config.RepositoryRestConfigurerAdapter
 import javax.annotation.PostConstruct
 
 
@@ -19,8 +23,18 @@ class WampApplication {
         camelConfig.start()
     }
 
+}
+
+@Configuration
+class ExposeAllRepositoryRestConfiguration : RepositoryRestConfigurerAdapter() {
+
+    override fun configureRepositoryRestConfiguration(config: RepositoryRestConfiguration?) {
+        super.configureRepositoryRestConfiguration(config)
+        config?.exposeIdsFor(Product::class.java)
+    }
 
 }
+
 
 fun main(args: Array<String>) {
     SpringApplication.run(WampApplication::class.java, *args)

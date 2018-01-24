@@ -3,6 +3,7 @@ package com.serco.sentinel1.wamp
 import com.serco.sentinel1.wamp.model.Product
 import com.serco.sentinel1.wamp.model.ProductRepository
 import org.apache.camel.Exchange
+import org.apache.camel.builder.PredicateBuilder.and
 import org.apache.camel.builder.RouteBuilder
 import org.apache.camel.component.jackson.ListJacksonDataFormat
 import org.elasticsearch.index.query.QueryBuilders.matchAllQuery
@@ -56,7 +57,8 @@ class DhusPolling : RouteBuilder() {
                         exchange.out.body = "[" + m.group(1) + "]"
                     }
                 }).unmarshal(format).process({ exchange ->
-                    for (entry in exchange.`in`.body as Iterable<Map<String, Any>>) {
+                    (exchange.`in`.body as List<Map<String, Any>>).parallelStream().forEach { entry ->
+//                    for (entry in exchange.`in`.body as Iterable<Map<String, Any>>) {
                         val productName = entry["Name"].toString()
                         val ingestionDate = Timestamp(entry["IngestionDate"].toString().substring(6, entry["IngestionDate"].toString().lastIndexOf(")")).toLong())
 
@@ -64,7 +66,7 @@ class DhusPolling : RouteBuilder() {
                         val attributes = ((attributesQueryResults["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
                                 .map {it["Name"] to it["Value"]}.toMap()
                         val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
-                        val p = Product(UUID.randomUUID(), productName, sdf.parse(productName.substring(17, 32)),
+                        val p = Product(productName, sdf.parse(productName.substring(17, 32)),
                                 sdf.parse(productName.substring(33, 48)), productName.substring(0, 3),
                                 productName.substring(56, 62), productName.substring(49, 55).toLong(), productName.substring(4, 16),
                                 attributes["Timeliness Category"], productName.substring(63, 67),
@@ -81,10 +83,10 @@ class DhusPolling : RouteBuilder() {
                     exchange.out.body = null
                     exchange.out.setHeader("skip", exchange.out.getHeader("skip") as Int + 100)
                 })
-                .choice().`when`(header("productNumber").isEqualTo(100))
+                .choice().`when`(and(header("productNumber").isEqualTo(100), header("skip").isLessThan(10000)) )
                 .to("seda:query-dhus")
 
-        from("timer://productListTimer?fixedRate=true&period=300m").routeId("dhus-poll").autoStartup(true)
+        from("timer://productListTimer?fixedRate=true&period=70m").routeId("dhus-poll").autoStartup(true)
                 .process({ exchange ->
                     val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
