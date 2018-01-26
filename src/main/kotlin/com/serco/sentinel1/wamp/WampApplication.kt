@@ -1,10 +1,12 @@
 package com.serco.sentinel1.wamp
 
+import com.serco.sentinel1.wamp.config.WampConfig
 import com.serco.sentinel1.wamp.model.Product
 import org.apache.camel.impl.DefaultCamelContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.rest.core.config.RepositoryRestConfiguration
 import org.springframework.data.rest.webmvc.config.RepositoryRestConfigurerAdapter
@@ -12,6 +14,7 @@ import javax.annotation.PostConstruct
 
 
 @SpringBootApplication
+@EnableConfigurationProperties(WampConfig::class)
 class WampApplication {
     @Autowired lateinit var dhusPolling: DhusPolling
 

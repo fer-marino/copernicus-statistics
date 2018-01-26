@@ -9,19 +9,21 @@ spring.data.elasticsearch:
 #spring.main.web-environment: false
 spring.data.rest:
   base-path: /api
-  max-page-size: 100
+  max-page-size: 5000
   default-page-size: 100
 
-
 spring.jackson.serialization.write_dates_as_timestamps: false
-
 
 wamp:
   dhusId: Scihub
   dhusUser: test
   dhusPassword: test
-  dhusUrl: https://scihub.copernicus.eu/dhus/
-  pollInterval: 6h
+  dhusUrl: https://scihub.copernicus.eu/apihub
+  pollInterval: 36m
+  filter:
+  extra:
+  connectionTimeout: 2000
+  readTimeout: 20000
 
 server:
   port: 8698

@@ -23,6 +23,7 @@ data class Product (@Id @Field(type = FieldType.keyword, fielddata = true) var n
                     @Field(type = FieldType.keyword) var crc: String,
                     @LastModifiedDate var publishedHub: Date,
                     var attributes: Map<String?, String?>) {
+    // noarg constructor needed by jackson
     constructor(): this("", Date(), Date(), "", "", 0, "",
             null, "", Date(), mapOf())
 }
@@ -30,3 +31,13 @@ data class Product (@Id @Field(type = FieldType.keyword, fielddata = true) var n
 @CrossOrigin(origins = arrayOf("http://localhost:3000"))
 @RepositoryRestResource(collectionResourceRel = "product", path = "product")
 interface ProductRepository: PagingAndSortingRepository<Product, String>, ElasticsearchRepository<Product, String>
+//{
+//    @PreAuthorize("hasRole('ROLE_ADMIN')")
+//    override fun delete(product: Product)
+//
+//    @PreAuthorize("hasRole('ROLE_ADMIN')")
+//    override fun deleteAll(products: Iterable<Product>)
+//
+//    @PreAuthorize("hasRole('ROLE_ADMIN')")
+//    override fun deleteAll()
+//}
