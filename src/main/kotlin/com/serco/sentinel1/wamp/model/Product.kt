@@ -1,43 +1,52 @@
 package com.serco.sentinel1.wamp.model
 
-import org.springframework.data.annotation.Id
+import com.esri.core.geometry.Geometry
+import com.esri.core.geometry.OperatorExportToGeoJson
+import com.fasterxml.jackson.annotation.JsonRawValue
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.JsonSerializer
+import com.fasterxml.jackson.databind.SerializerProvider
 import org.springframework.data.annotation.LastModifiedDate
-import org.springframework.data.elasticsearch.annotations.Document
-import org.springframework.data.elasticsearch.annotations.Field
-import org.springframework.data.elasticsearch.annotations.FieldType
-import org.springframework.data.elasticsearch.repository.ElasticsearchRepository
-import org.springframework.data.repository.PagingAndSortingRepository
-import org.springframework.data.rest.core.annotation.RepositoryRestResource
-import org.springframework.web.bind.annotation.CrossOrigin
+import java.io.IOException
 import java.util.*
 
-@Document(indexName = "product", type = "product", shards = 3, replicas = 0, refreshInterval = "-1")
-data class Product (@Id @Field(type = FieldType.keyword, fielddata = true) var name: String,
-                    var start: Date,
-                    var stop: Date,
-                    @Field(type = FieldType.keyword) var mission: String,
-                    @Field(type = FieldType.keyword) var dtId: String,
-                    var orbit: Long,
-                    @Field(type = FieldType.keyword) var prodType: String,
-                    @Field(type = FieldType.keyword) var timeliness: String?,
-                    @Field(type = FieldType.keyword) var crc: String,
-                    @LastModifiedDate var publishedHub: Date,
-                    var attributes: Map<String?, String?>) {
-    // noarg constructor needed by jackson
-    constructor(): this("", Date(), Date(), "", "", 0, "",
-            null, "", Date(), mapOf())
+
+data class Product (
+                    var name: String = "",
+                    var start: Date = Date(),
+                    var stop: Date = Date(),
+                    var mission: String = "",
+                    var dtId: String = "",
+                    var orbit: Long = 0,
+                    var prodType: String = "",
+                    var timeliness: String? = null,
+                    var crc: String = "",
+                    @LastModifiedDate var publishedHub: Date = Date(),
+                    var attributes: Map<String?, String?> = mapOf())
+
+data class ProductNew (
+        var name: String = "",
+        var start: String = "",
+        var stop: String = "",
+        var mission: String = "",
+        var dtId: String = "",
+        var orbit: Int = 0,
+        var prodType: String = "",
+        var timeliness: String? = null,
+        var crc: String = "",
+        @JsonRawValue var footprint: String?,
+        @LastModifiedDate var publishedHub: String = "",
+        var attributes: Map<String?, String?> = mapOf()) {
+
 }
 
-@CrossOrigin(origins = arrayOf("http://localhost:3000"))
-@RepositoryRestResource(collectionResourceRel = "product", path = "product")
-interface ProductRepository: PagingAndSortingRepository<Product, String>, ElasticsearchRepository<Product, String>
-//{
-//    @PreAuthorize("hasRole('ROLE_ADMIN')")
-//    override fun delete(product: Product)
-//
-//    @PreAuthorize("hasRole('ROLE_ADMIN')")
-//    override fun deleteAll(products: Iterable<Product>)
-//
-//    @PreAuthorize("hasRole('ROLE_ADMIN')")
-//    override fun deleteAll()
-//}
+
+class GeometryToStringSerializer : JsonSerializer<Geometry>() {
+
+    @Throws(IOException::class, JsonProcessingException::class)
+    override fun serialize(input: Geometry, jsonGenerator: JsonGenerator, serializerProvider: SerializerProvider) {
+        jsonGenerator.writeObject(OperatorExportToGeoJson.local().execute(input))
+    }
+
+}

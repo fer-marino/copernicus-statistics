@@ -2,7 +2,8 @@ buildscript {
 	ext {
 		kotlinVersion = '1.1.61'
 		springBootVersion = '2.0.0.M7'
-		camelVersion = '2.20.1'
+		camelVersion = '2.20.2'
+        elasticsearchVersion = '6.1.2'
 	}
 	repositories {
 		mavenCentral()
@@ -44,7 +45,6 @@ repositories {
 
 dependencies {
     // spring dependencies
-    compile 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
     compile 'org.springframework.boot:spring-boot-starter-data-rest'
 //    compile 'org.springframework.boot:spring-boot-starter-data-ldap'
 //    compile 'org.springframework.boot:spring-boot-starter-security'
@@ -59,6 +59,12 @@ dependencies {
 //    compile "org.apache.camel:camel-spring-boot-starter:$camelVersion"
     compile "org.apache.camel:camel-jackson:${camelVersion}"
     compile "org.apache.camel:camel-http:${camelVersion}"
+
+//	compile "org.elasticsearch.client:x-pack-transport:${elasticsearchVersion}"
+    compile "org.elasticsearch.client:elasticsearch-rest-high-level-client:${elasticsearchVersion}"
+    compile "org.elasticsearch:elasticsearch:${elasticsearchVersion}"
+
+	compile 'com.esri.geometry:esri-geometry-api:2.0.0'
 
     // test
 	testCompile 'org.springframework.boot:spring-boot-starter-test'

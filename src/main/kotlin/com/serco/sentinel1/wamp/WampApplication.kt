@@ -28,7 +28,7 @@ class WampApplication {
 
 }
 
-@Configuration
+@Configuration // FIXME no more needed?
 class ExposeAllRepositoryRestConfiguration : RepositoryRestConfigurerAdapter() {
 
     override fun configureRepositoryRestConfiguration(config: RepositoryRestConfiguration?) {

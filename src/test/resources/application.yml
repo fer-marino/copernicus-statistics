@@ -26,7 +26,6 @@ wamp:
   extra:
   connectionTimeout: 200000
   readTimeout: 200000
-  autoStart: true
 
 server:
   port: 8698
