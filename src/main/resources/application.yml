@@ -26,7 +26,14 @@ wamp:
   extra:
   connectionTimeout: 200000
   readTimeout: 200000
-  autoStart: true
+  autoStart: false
+
+elasticsearch:
+  url: localhost
+  port: 9200
+  scheme: http
+  user: elastic
+  password: password
 
 server:
   port: 8698

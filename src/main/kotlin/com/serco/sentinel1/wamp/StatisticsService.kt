@@ -1,6 +1,7 @@
 package com.serco.sentinel1.wamp
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.serco.sentinel1.wamp.config.WampConfig
 import com.serco.sentinel1.wamp.model.StatsDataDaily
 import com.serco.sentinel1.wamp.model.StatsDataHourly
 import org.elasticsearch.action.ActionListener
@@ -32,6 +33,7 @@ import java.util.*
 @RestController
 class StatisticsService {
     @Autowired lateinit var esClient: RestHighLevelClient
+    @Autowired lateinit var config: WampConfig
 
     private val aggregationHourly: DateHistogramAggregationBuilder get() {
         val dateHistogram = AggregationBuilders.dateHistogram("production_per_hour")
@@ -58,7 +60,7 @@ class StatisticsService {
         val query = SearchSourceBuilder().query(filter).aggregation(aggregationHourly)
         val output= mutableListOf<StatsDataHourly>()
 
-        esClient.search(SearchRequest("product").source(query)).aggregations.get<Histogram>("production_per_hour").buckets.forEach {
+        esClient.search(SearchRequest(config.indexName).source(query)).aggregations.get<Histogram>("production_per_hour").buckets.forEach {
             val date = (it.key as DateTime).toDate()
             it.aggregations.get<Terms>("prod_type").buckets.forEach {
                 val avg = it.aggregations.get<Avg>("delay_avg")
@@ -86,7 +88,7 @@ class StatisticsService {
 
         val query = SearchSourceBuilder().aggregation(aggregationHourly)
 
-        esClient.searchAsync(SearchRequest("product").source(query), ActionListener.wrap({
+        esClient.searchAsync(SearchRequest(config.indexName).source(query), ActionListener.wrap({
                 it.aggregations.get<Histogram>("production_per_hour").buckets.forEach {
                     val date = (it.key as DateTime).toDate()
                     it.aggregations.get<Terms>("prod_type").buckets.forEach {
@@ -140,7 +142,7 @@ class StatisticsService {
 
     @RequestMapping("/api/statistics/lastIngestedProduct")
     fun lastIngestionDate(): ResponseEntity<Date> {
-        val searchQuery = SearchRequest("product").source( SearchSourceBuilder()
+        val searchQuery = SearchRequest(config.indexName).source( SearchSourceBuilder()
                 .query(QueryBuilders.matchAllQuery())
                 .aggregation( AggregationBuilders.max("max_publication").field("publishedHub") )
         )

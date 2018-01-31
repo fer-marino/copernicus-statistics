@@ -2,6 +2,7 @@ package com.serco.sentinel1.wamp
 
 import com.esri.core.geometry.*
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.serco.sentinel1.wamp.config.WampConfig
 import com.serco.sentinel1.wamp.model.ProductNew
 import org.apache.http.entity.ContentType
 import org.apache.http.nio.entity.NStringEntity
@@ -109,13 +110,13 @@ class ProductService {
                     .query(matchAllQuery())
                     .size(pageSize)
                     .timeout(TimeValue.timeValueSeconds(10))
-            val searchRequest = SearchRequest("product").source(searchSourceBuilder).scroll(scroll)
+            val searchRequest = SearchRequest(from).source(searchSourceBuilder).scroll(scroll)
 
             var searchResponse = esClient.search(searchRequest)
             var scrollId = searchResponse.scrollId
             var hits = searchResponse.hits.hits
 
-            var scrollRequest: SearchScrollRequest// = SearchScrollRequest(scrollId).scroll(scroll)
+            var scrollRequest: SearchScrollRequest
 
             val om = ObjectMapper()
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
@@ -164,7 +165,9 @@ class ProductService {
 
                         count++
                     } catch (e: Exception) {
-                        print("Error during product retrieval of ${it.id}. Skipping. Detailed message: ${e.message}")
+                        println("Error during product retrieval of ${it.id}. Skipping. Detailed message: ${e.message}")
+                    } catch (e: NullPointerException) {
+                        println("NPE during product retrieval of ${it.id}. Line ${e.stackTrace[0]}, ${e.stackTrace[1]}")
                     }
                 }
 
@@ -185,10 +188,10 @@ class ProductService {
                 }
 
                 // stats
-                val prodPerSec = (System.currentTimeMillis() - start).toDouble()/1000 / pageSize
-                val estimateDuration =  Duration.of(((totalHits - count) * prodPerSec).toLong(), ChronoUnit.SECONDS)
+                val prodPerSec = pageSize.toDouble() / ((System.currentTimeMillis() - start).toDouble()/1000)
+                val estimateDuration =  Duration.of(((totalHits - count) / prodPerSec).toLong(), ChronoUnit.SECONDS)
                 val elapsedTime = Duration.of(System.currentTimeMillis() - overallStart, ChronoUnit.MILLIS)
-                print("\r *** Product migrated $count/$totalHits (${Math.round(count.toDouble()/totalHits *10000)/100.toDouble()} %)" +
+                print("\r *** Product migrated $count/$totalHits (${Math.round(count.toDouble()/totalHits *10000)/100.toDouble()}%)" +
                         " as ${Math.round(prodPerSec*1000).toDouble()/1000} prod/sec. Elapsed ${elapsedTime.pretty()}, Remaining ${estimateDuration.pretty()}")
             }
 

@@ -10,6 +10,7 @@ import org.apache.camel.component.jackson.ListJacksonDataFormat
 import org.elasticsearch.action.ActionListener
 import org.elasticsearch.action.DocWriteResponse
 import org.elasticsearch.action.bulk.BulkRequest
+import org.elasticsearch.action.get.GetRequest
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.action.search.SearchRequest
 import org.elasticsearch.client.RestHighLevelClient
@@ -18,6 +19,7 @@ import org.elasticsearch.index.query.QueryBuilders.matchAllQuery
 import org.elasticsearch.search.aggregations.AggregationBuilders
 import org.elasticsearch.search.aggregations.metrics.max.Max
 import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.client.SimpleClientHttpRequestFactory
@@ -34,11 +36,11 @@ import java.util.regex.Pattern
 @Component
 class DhusPolling : RouteBuilder() {
     @Autowired lateinit var restTemplateBuilder: RestTemplateBuilder
-    private var logger: Logger = Logger.getLogger("DhusPolling")
-
-    private var running = AtomicBoolean(false)
     @Autowired lateinit var wampConfig: WampConfig
     @Autowired lateinit var esClient: RestHighLevelClient
+
+    private var running = AtomicBoolean(false)
+    private var logger: Logger = Logger.getLogger("DhusPolling")
 
     private val restTemplate: RestTemplate by lazy {
         restTemplateBuilder.requestFactory(SimpleClientHttpRequestFactory::class.java)
@@ -85,29 +87,43 @@ class DhusPolling : RouteBuilder() {
                         val productName = entry["Name"].toString()
                         val ingestionDate = Timestamp(entry["IngestionDate"].toString().substring(6, entry["IngestionDate"].toString().lastIndexOf(")")).toLong())
                         val t = System.currentTimeMillis()
-                        val attributesQueryResults = restTemplate.getForObject(((entry["Attributes"] as Map<String, Any>)["__deferred"] as Map<String, Any>)["uri"] as String, Map::class.java)
+                        var doFetch = true
+                        if(wampConfig.upsert) {
+                            val getRequest = GetRequest(wampConfig.indexName, wampConfig.indexName, productName)
+                                    .fetchSourceContext(FetchSourceContext(false))
+                            val response = esClient.get(getRequest)
+                            if(response.isExists)
+                                doFetch = false
+                        }
 
-                        if(System.currentTimeMillis() - t > 5000)
-                            logger.info("Slow metadata query for $productName. It took ${System.currentTimeMillis() - t} msec")
+                        if(doFetch) {
+                            val attributesQueryResults = restTemplate.getForObject(((entry["Attributes"] as Map<String, Any>)["__deferred"] as Map<String, Any>)["uri"] as String, Map::class.java)
 
-                        val attributes = ((attributesQueryResults["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
-                                .map {it["Name"] to it["Value"]}.toMap()
-                        val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
-                        val p = Product(productName, sdf.parse(productName.substring(17, 32)),
-                                sdf.parse(productName.substring(33, 48)), productName.substring(0, 3),
-                                productName.substring(56, 62), productName.substring(49, 55).toLong(), productName.substring(4, 16),
-                                attributes["Timeliness Category"], productName.substring(63, 67),
-                                ingestionDate, attributes)
+                            if (System.currentTimeMillis() - t > 5000)
+                                logger.info("Slow metadata query for $productName. It took ${System.currentTimeMillis() - t} msec")
 
-                        synchronized(bulkRequest, { bulkRequest.add(buildIndexRequest(p)) } )
+                            val attributes = ((attributesQueryResults["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
+                                    .map { it["Name"] to it["Value"] }.toMap()
+                            val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
+                            val p = Product(productName, sdf.parse(productName.substring(17, 32)),
+                                    sdf.parse(productName.substring(33, 48)), productName.substring(0, 3),
+                                    productName.substring(56, 62), productName.substring(49, 55).toLong(), productName.substring(4, 16),
+                                    attributes["Timeliness Category"], productName.substring(63, 67),
+                                    ingestionDate, attributes)
+
+                            synchronized(bulkRequest, { bulkRequest.add(buildIndexRequest(p)) })
+                        }
                     }
 
-                    esClient.bulkAsync(bulkRequest, ActionListener.wrap({
-                        it.forEach {
-                            if (it.opType == DocWriteResponse.Result.UPDATED)
-                                println("Product ${it.id} updated")
-                        }
-                    }, { error("Error during bulk ingestion ${it.message}")}) )
+                    if(bulkRequest.numberOfActions() > 0) {
+                        esClient.bulkAsync(bulkRequest, ActionListener.wrap({
+                            it.forEach {
+                                if (it.opType == DocWriteResponse.Result.UPDATED)
+                                    println("Product ${it.id} updated")
+                            }
+                        }, { error("Error during bulk ingestion ${it.message}") }))
+                    } else
+                        logger.info("Nothing to do")
 
                     exchange.out = exchange.`in`.copy()
                     exchange.out.setHeader("productNumber", (exchange.`in`.body as List<Map<String, Any>>).size)
@@ -138,11 +154,13 @@ class DhusPolling : RouteBuilder() {
                             .field("publishedHub") )
 
                     var last = Date(0)
-                    val value = esClient.search(SearchRequest("product")
-                            .source(searchQuery))
-                            .aggregations.get<Max>("max_publication").value
+                    if(!wampConfig.reindex) {
+                        val value = esClient.search(SearchRequest(wampConfig.indexName)
+                                .source(searchQuery))
+                                .aggregations.get<Max>("max_publication").value
 
-                    last = Date( if(value.isFinite()) value.toLong() else 0 )
+                        last = Date(if (value.isFinite()) value.toLong() else 0)
+                    }
 
                     exchange.out.setHeader("filter", "substringof('S1', Name) and IngestionDate gt datetime'${sdf.format(last)}'")
                     exchange.out.setHeader("skip", 0)
@@ -153,7 +171,7 @@ class DhusPolling : RouteBuilder() {
     }
 
     private fun buildIndexRequest(prod: Product): IndexRequest {
-        val indexRequest = IndexRequest("product", "product", prod.name)
+        val indexRequest = IndexRequest(wampConfig.indexName, wampConfig.indexName, prod.name)
         val objectMapper = ObjectMapper()
         return indexRequest.source( objectMapper.writeValueAsString(prod), XContentType.JSON )
     }
