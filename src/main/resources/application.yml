@@ -27,6 +27,8 @@ wamp:
   connectionTimeout: 200000
   readTimeout: 200000
   autoStart: false
+  reindex: false
+  upsert: true
 
 elasticsearch:
   url: localhost

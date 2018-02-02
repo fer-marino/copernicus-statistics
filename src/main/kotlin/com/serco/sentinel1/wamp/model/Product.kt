@@ -12,7 +12,7 @@ import java.io.IOException
 import java.util.*
 
 
-data class Product (
+data class ProductOld (
                     var name: String = "",
                     var start: Date = Date(),
                     var stop: Date = Date(),
@@ -25,7 +25,7 @@ data class Product (
                     @LastModifiedDate var publishedHub: Date = Date(),
                     var attributes: Map<String?, String?> = mapOf())
 
-data class ProductNew (
+data class Product (
         var name: String = "",
         var start: String = "",
         var stop: String = "",

@@ -1,5 +1,6 @@
 package com.serco.sentinel1.wamp
 
+import com.esri.core.geometry.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.serco.sentinel1.wamp.config.WampConfig
 import com.serco.sentinel1.wamp.model.Product
@@ -105,13 +106,29 @@ class DhusPolling : RouteBuilder() {
                             val attributes = ((attributesQueryResults["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
                                     .map { it["Name"] to it["Value"] }.toMap()
                             val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
-                            val p = Product(productName, sdf.parse(productName.substring(17, 32)),
-                                    sdf.parse(productName.substring(33, 48)), productName.substring(0, 3),
-                                    productName.substring(56, 62), productName.substring(49, 55).toLong(), productName.substring(4, 16),
-                                    attributes["Timeliness Category"], productName.substring(63, 67),
-                                    ingestionDate, attributes)
+                            val sdfElastic = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
-                            synchronized(bulkRequest, { bulkRequest.add(buildIndexRequest(p)) })
+                            var geometry = OperatorImportFromWkt.local().execute(WktImportFlags.wktImportDefaults,
+                                    Geometry.Type.Polygon,
+                                    attributes["JTS footprint"]!!,
+                                    null)
+                            geometry = OperatorSimplifyOGC.local().execute(geometry, SpatialReference.create(4326), true, null)
+                            val geoJson = OperatorExportToGeoJson.local().execute(geometry)
+
+                            val prod = Product(productName,
+                                    sdfElastic.format(sdf.parse(productName.substring(17, 32))),
+                                    sdfElastic.format(sdf.parse(productName.substring(33, 48))),
+                                    productName.substring(0, 3),
+                                    productName.substring(56, 62),
+                                    productName.substring(49, 55).toInt(),
+                                    productName.substring(4, 16),
+                                    attributes["Timeliness Category"],
+                                    productName.substring(63, 67),
+                                    geoJson,
+                                    sdfElastic.format(ingestionDate),
+                                    attributes)
+
+                            synchronized(bulkRequest, { bulkRequest.add(buildIndexRequest(prod)) })
                         }
                     }
 

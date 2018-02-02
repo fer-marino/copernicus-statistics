@@ -3,7 +3,7 @@ package com.serco.sentinel1.wamp
 import com.esri.core.geometry.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.serco.sentinel1.wamp.config.WampConfig
-import com.serco.sentinel1.wamp.model.ProductNew
+import com.serco.sentinel1.wamp.model.Product
 import org.apache.http.entity.ContentType
 import org.apache.http.nio.entity.NStringEntity
 import org.elasticsearch.ElasticsearchException
@@ -142,7 +142,7 @@ class ProductService {
                         geometry = OperatorSimplifyOGC.local().execute(geometry, SpatialReference.create(4326), true, null)
                         val geoJson = OperatorExportToGeoJson.local().execute(geometry)
 
-                        val prod = ProductNew(res["name"] as String,
+                        val prod = Product(res["name"] as String,
                                 sdf.format(Date(res["start"] as Long)),
                                 sdf.format(Date(res["stop"] as Long)),
                                 res["mission"] as String,
