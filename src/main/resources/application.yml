@@ -29,16 +29,22 @@ wamp:
   autoStart: false
   reindex: false
   upsert: true
+  index-name: product
+  index-type: products
 
-elasticsearch:
-  url: localhost
-  port: 9200
+elasticSearch:
+  url: cop.sentinel1.eo.esa.int
+  port: 80
   scheme: http
   user: elastic
   password: password
+  prefix: es
 
 server:
   port: 8698
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/csv
 
 
 

@@ -24,13 +24,13 @@ apply plugin: "kotlin-noarg"
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
+apply plugin: 'kotlin-kapt'
 
 group = 'com.serco.sentinel1'
 version = '0.0.1-SNAPSHOT'
 sourceCompatibility = 1.8
 compileKotlin {
 	kotlinOptions.jvmTarget = "1.8"
-    dependsOn(processResources)
 }
 compileTestKotlin {
 	kotlinOptions.jvmTarget = "1.8"
@@ -48,7 +48,8 @@ dependencies {
     compile 'org.springframework.boot:spring-boot-starter-data-rest'
 //    compile 'org.springframework.boot:spring-boot-starter-data-ldap'
 //    compile 'org.springframework.boot:spring-boot-starter-security'
-    compile "org.springframework.boot:spring-boot-configuration-processor"
+	kapt "org.springframework.boot:spring-boot-configuration-processor"
+	compileOnly "org.springframework.boot:spring-boot-configuration-processor"
 
     // kotlin dependencies
 	compile "org.jetbrains.kotlin:kotlin-stdlib-jre8"
@@ -69,4 +70,8 @@ dependencies {
     // test
 	testCompile 'org.springframework.boot:spring-boot-starter-test'
     testCompile 'org.springframework.security:spring-security-test'
+}
+
+bootJar {
+	launchScript()
 }
