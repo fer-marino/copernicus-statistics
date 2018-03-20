@@ -37,8 +37,8 @@ data class Product (
 interface ProductRepository: PagingAndSortingRepository<Product, String> {
     @Query("SELECT max(p.publishedHub) from Product p")
     fun getMaxPublishedHub(): LocalDateTime?
-//    @Query("SELECT p.* from Product p WHERE p.publishedHub BETWEEN ? AND ? ORDER BY p.publishedHub")
-//    fun findAllIn(start: LocalDateTime, stop: LocalDateTime): Iterable<Product>
+    @Query("SELECT p FROM Product p WHERE p.publishedHub BETWEEN ?1 AND ?2 ORDER BY p.publishedHub")
+    fun findAllIn(start: LocalDateTime, stop: LocalDateTime): Iterable<Product>
 }
 
 class GeometryToStringSerializer : JsonSerializer<Geometry>() {

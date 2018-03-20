@@ -28,11 +28,11 @@ class ProductService {
             val writer = ZipOutputStream(BufferedOutputStream(it))
             writer.putNextEntry(ZipEntry("exrtact.csv"))
 
-            writer.write("Name, start, stop, mission, dtId, orbit, prodType, timeliness, publishedHub, publishedOda\n".toByteArray())
+            writer.write("Name, start, stop, mission, dtId, orbit, prodType, timeliness, publishedHub, publishedOda, PAC\n".toByteArray())
 
-//            productRepo.findAllIn(LocalDateTime.now(), LocalDateTime.now()).forEach { p ->
-//                writer.write("${p.name}, ${p.start}, ${p.stop}, ${p.mission}, ${p.dtId}, ${p.orbit}, ${p.prodType}, ${p.timeliness}, ${p.publishedHub}, ${p.publishedOda}\n".toByteArray())
-//            }
+            productRepo.findAllIn(LocalDateTime.now(), LocalDateTime.now()).forEach { p ->
+                writer.write("${p.name}, ${p.start}, ${p.stop}, ${p.mission}, ${p.dtId}, ${p.orbit}, ${p.prodType}, ${p.timeliness}, ${p.publishedHub}, ${p.publishedOda}, ${p.pac}\n".toByteArray())
+            }
 
             writer.closeEntry()
             writer.close()

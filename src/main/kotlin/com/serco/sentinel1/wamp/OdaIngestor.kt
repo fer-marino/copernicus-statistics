@@ -17,7 +17,7 @@ class OdaIngestor: RouteBuilder() {
     @Autowired lateinit var productRepository: ProductRepository
 
     override fun configure() {
-        from("file:${config.odaInbox}").routeId("Oda-Ingestor")
+        from("file:${config.odaInbox}?include=.*.csv&delay=600000").routeId("Oda-Ingestor")
                 .log("Processing \${in.headers.CamelFileName}")
                 .unmarshal(CsvDataFormat(CSVFormat.EXCEL.withDelimiter(';').withFirstRecordAsHeader())).split(body())
                 .process {
