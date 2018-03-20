@@ -1,26 +1,13 @@
 package com.serco.sentinel1.wamp
 
 import com.esri.core.geometry.*
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.serco.sentinel1.wamp.config.WampConfig
 import com.serco.sentinel1.wamp.model.Product
+import com.serco.sentinel1.wamp.model.ProductRepository
 import org.apache.camel.Exchange
 import org.apache.camel.builder.PredicateBuilder.and
 import org.apache.camel.builder.RouteBuilder
 import org.apache.camel.component.jackson.ListJacksonDataFormat
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.DocWriteResponse
-import org.elasticsearch.action.bulk.BulkRequest
-import org.elasticsearch.action.get.GetRequest
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.search.SearchRequest
-import org.elasticsearch.client.RestHighLevelClient
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.QueryBuilders.matchAllQuery
-import org.elasticsearch.search.aggregations.AggregationBuilders
-import org.elasticsearch.search.aggregations.metrics.max.Max
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.client.SimpleClientHttpRequestFactory
@@ -28,6 +15,9 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Logger
@@ -38,7 +28,8 @@ import java.util.regex.Pattern
 class DhusPolling : RouteBuilder() {
     @Autowired lateinit var restTemplateBuilder: RestTemplateBuilder
     @Autowired lateinit var wampConfig: WampConfig
-    @Autowired lateinit var esClient: RestHighLevelClient
+
+    @Autowired lateinit var productRepository: ProductRepository
 
     private var running = AtomicBoolean(false)
     private var logger: Logger = Logger.getLogger("DhusPolling")
@@ -83,17 +74,15 @@ class DhusPolling : RouteBuilder() {
                         exchange.out.body = "[" + m.group(1) + "]"
                     }
                 }.unmarshal(format).process { exchange ->
-                    val bulkRequest = BulkRequest()
+                    val bulkRequest = mutableListOf<Product>()
                     (exchange.`in`.body as List<Map<String, Any>>).parallelStream().forEach { entry ->
                         val productName = entry["Name"].toString()
                         val ingestionDate = Timestamp(entry["IngestionDate"].toString().substring(6, entry["IngestionDate"].toString().lastIndexOf(")")).toLong())
                         val t = System.currentTimeMillis()
                         var doFetch = true
                         if(wampConfig.upsert) {
-                            val getRequest = GetRequest(wampConfig.indexName, wampConfig.indexName, productName)
-                                    .fetchSourceContext(FetchSourceContext(false))
-                            val response = esClient.get(getRequest)
-                            if(response.isExists)
+                            val exist = productRepository.existsById(productName)
+                            if(exist)
                                 doFetch = false
                         }
 
@@ -103,10 +92,9 @@ class DhusPolling : RouteBuilder() {
                             if (System.currentTimeMillis() - t > 5000)
                                 logger.info("Slow metadata query for $productName. It took ${System.currentTimeMillis() - t} msec")
 
-                            val attributes = ((attributesQueryResults["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
+                            val attributes = ((attributesQueryResults!!["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
                                     .map { it["Name"] to it["Value"] }.toMap()
-                            val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss")
-                            val sdfElastic = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+                            val sdf = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
 
                             var geometry = OperatorImportFromWkt.local().execute(WktImportFlags.wktImportDefaults,
                                     Geometry.Type.Polygon,
@@ -116,8 +104,8 @@ class DhusPolling : RouteBuilder() {
                             val geoJson = OperatorExportToGeoJson.local().execute(geometry)
 
                             val prod = Product(productName,
-                                    sdfElastic.format(sdf.parse(productName.substring(17, 32))),
-                                    sdfElastic.format(sdf.parse(productName.substring(33, 48))),
+                                    LocalDateTime.parse(productName.substring(17, 32), sdf),
+                                    LocalDateTime.parse(productName.substring(33, 48), sdf),
                                     productName.substring(0, 3),
                                     productName.substring(56, 62),
                                     productName.substring(49, 55).toInt(),
@@ -125,21 +113,18 @@ class DhusPolling : RouteBuilder() {
                                     attributes["Timeliness Category"],
                                     productName.substring(63, 67),
                                     geoJson,
-                                    sdfElastic.format(ingestionDate),
+                                    ingestionDate.toLocalDateTime(),
+                                    null,
+                                    null, null,
                                     attributes)
 
-                            synchronized(bulkRequest, { bulkRequest.add(buildIndexRequest(prod)) })
+                            synchronized(bulkRequest, { bulkRequest.add(prod) })
                         }
                     }
 
-                    if(bulkRequest.numberOfActions() > 0) {
-                        esClient.bulkAsync(bulkRequest, ActionListener.wrap({
-                            it.forEach {
-                                if (it.opType == DocWriteResponse.Result.UPDATED)
-                                    println("Product ${it.id} updated")
-                            }
-                        }, { error("Error during bulk ingestion ${it.message}") }))
-                    } else
+                    if(bulkRequest.size > 0)
+                        productRepository.saveAll(bulkRequest)
+                    else
                         logger.info("Nothing to do")
 
                     exchange.out = exchange.`in`.copy()
@@ -165,18 +150,11 @@ class DhusPolling : RouteBuilder() {
 
                     val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
-                    val searchQuery = SearchSourceBuilder()
-                            .query(matchAllQuery())
-                            .aggregation( AggregationBuilders.max("max_publication")
-                            .field("publishedHub") )
-
                     var last = Date(0)
                     if(!wampConfig.reindex) {
-                        val value = esClient.search(SearchRequest(wampConfig.indexName)
-                                .source(searchQuery))
-                                .aggregations.get<Max>("max_publication").value
+                        val value = productRepository.getMaxPublishedHub()
 
-                        last = Date(if (value.isFinite()) value.toLong() else 0)
+                        last = Date(value?.atZone(ZoneId.of("UTC"))?.toEpochSecond() ?: 0)
                     }
 
                     exchange.out.setHeader("filter", "substringof('S1', Name) and IngestionDate gt datetime'${sdf.format(last)}'")
@@ -187,11 +165,6 @@ class DhusPolling : RouteBuilder() {
 
     }
 
-    private fun buildIndexRequest(prod: Product): IndexRequest {
-        val indexRequest = IndexRequest(wampConfig.indexName, wampConfig.indexName, prod.name)
-        val objectMapper = ObjectMapper()
-        return indexRequest.source( objectMapper.writeValueAsString(prod), XContentType.JSON )
-    }
 }
 
 

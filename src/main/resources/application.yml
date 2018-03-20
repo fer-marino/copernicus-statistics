@@ -3,10 +3,6 @@
 # ===============================
 # Set here configurations for the database connection
 
-spring.data.elasticsearch:
-  cluster-nodes: 127.0.0.1:9300
-#  properties:
-#    xpack.security.user: elastic:password
 
 #spring.main.web-environment: false
 spring.data.rest:
@@ -29,22 +25,22 @@ wamp:
   autoStart: false
   reindex: false
   upsert: true
-  index-name: product
-  index-type: products
-
-elasticSearch:
-  url: cop.sentinel1.eo.esa.int
-  port: 80
-  scheme: http
-  user: elastic
-  password: password
-  prefix: es
+  odaInbox: C:/Users/fernando marino/Desktop/report-dhus-oda
 
 server:
   port: 8698
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/csv
+
+spring:
+  datasource:
+    url: jdbc:h2:file:C:/Users/fernando marino/Desktop/report-dhus-oda/statistics
+  jpa:
+    hibernate:
+      ddl-auto: create
+
+
 
 
 
