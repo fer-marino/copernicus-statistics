@@ -74,11 +74,9 @@ class DhusPolling : RouteBuilder() {
                         exchange.out.body = "[" + m.group(1) + "]"
                     }
                 }.unmarshal(format).process { exchange ->
-                    val bulkRequest = mutableListOf<Product>()
                     (exchange.`in`.body as List<Map<String, Any>>).parallelStream().forEach { entry ->
                         val productName = entry["Name"].toString()
                         val ingestionDate = Timestamp(entry["IngestionDate"].toString().substring(6, entry["IngestionDate"].toString().lastIndexOf(")")).toLong())
-                        val t = System.currentTimeMillis()
                         var doFetch = true
                         if(wampConfig.upsert) {
                             val exist = productRepository.existsById(productName)
@@ -87,45 +85,22 @@ class DhusPolling : RouteBuilder() {
                         }
 
                         if(doFetch) {
-                            val attributesQueryResults = restTemplate.getForObject(((entry["Attributes"] as Map<String, Any>)["__deferred"] as Map<String, Any>)["uri"] as String, Map::class.java)
-
-                            if (System.currentTimeMillis() - t > 5000)
-                                logger.info("Slow metadata query for $productName. It took ${System.currentTimeMillis() - t} msec")
-
-                            val attributes = ((attributesQueryResults!!["d"] as Map<String, Any>)["results"] as List<Map<String, String>>)
-                                    .map { it["Name"] to it["Value"] }.toMap()
                             val sdf = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
 
-                            var geometry = OperatorImportFromWkt.local().execute(WktImportFlags.wktImportDefaults,
-                                    Geometry.Type.Polygon,
-                                    attributes["JTS footprint"]!!,
-                                    null)
-                            geometry = OperatorSimplifyOGC.local().execute(geometry, SpatialReference.create(4326), true, null)
-                            val geoJson = OperatorExportToGeoJson.local().execute(geometry)
-
-                            val prod = Product(productName,
+                            val prod = Product("$productName.SAFE",
                                     LocalDateTime.parse(productName.substring(17, 32), sdf),
                                     LocalDateTime.parse(productName.substring(33, 48), sdf),
                                     productName.substring(0, 3),
                                     productName.substring(56, 62),
                                     productName.substring(49, 55).toInt(),
-                                    productName.substring(4, 16),
-                                    attributes["Timeliness Category"],
-                                    productName.substring(63, 67),
-                                    geoJson,
-                                    ingestionDate.toLocalDateTime(),
-                                    null,
-                                    null, null,
-                                    attributes)
+                                    productName.substring(4, 16), null,
+                                    productName.substring(63, 67), null,
+                                    ingestionDate.toLocalDateTime()
+                                    )
 
-                            synchronized(bulkRequest, { bulkRequest.add(prod) })
+                            productRepository.save(prod)
                         }
                     }
-
-                    if(bulkRequest.size > 0)
-                        productRepository.saveAll(bulkRequest)
-                    else
-                        logger.info("Nothing to do")
 
                     exchange.out = exchange.`in`.copy()
                     exchange.out.setHeader("productNumber", (exchange.`in`.body as List<Map<String, Any>>).size)
@@ -150,12 +125,16 @@ class DhusPolling : RouteBuilder() {
 
                     val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
-                    var last = Date(0)
-                    if(!wampConfig.reindex) {
-                        val value = productRepository.getMaxPublishedHub()
+                    val origin = if(wampConfig.dhusIngestedFrom.isNotBlank()) sdf.parse(wampConfig.dhusIngestedFrom).time else 0
+                    val last = if(!wampConfig.reindex) {
+                        val max = productRepository.getMaxPublishedHub()?.atZone(ZoneId.of("UTC"))?.toEpochSecond()?.let { Math.max(origin, it*1000) }
 
-                        last = Date(value?.atZone(ZoneId.of("UTC"))?.toEpochSecond() ?: 0)
-                    }
+                        if(max != null)
+                            Date(max - 3600*12*1000)
+                        else
+                            Date(origin)
+                    } else
+                        Date(origin)
 
                     exchange.out.setHeader("filter", "substringof('S1', Name) and IngestionDate gt datetime'${sdf.format(last)}'")
                     exchange.out.setHeader("skip", 0)

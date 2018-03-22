@@ -7,13 +7,15 @@ import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.SerializerProvider
-import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.CrudRepository
 import org.springframework.data.repository.PagingAndSortingRepository
 import java.io.IOException
 import java.time.LocalDateTime
-import java.util.*
-import javax.persistence.*
+import javax.persistence.Column
+import javax.persistence.ElementCollection
+import javax.persistence.Entity
+import javax.persistence.Id
 
 @Entity
 data class Product (
@@ -26,15 +28,16 @@ data class Product (
         var prodType: String = "",
         var timeliness: String? = null,
         var crc: String = "",
-        @JsonRawValue var footprint: String? = null,
+        @JsonRawValue @Column(columnDefinition = "text") var footprint: String? = null,
         var publishedHub: LocalDateTime? = null,
         var publishedOda: LocalDateTime? = null,
         var pac: String? = null,
         var odaSubscription: String? = null,
-        @ElementCollection var attributes: Map<String?, String?> = mapOf()
+        @ElementCollection @Column(columnDefinition = "text")
+        var attributes: MutableMap<String?, String?> = mutableMapOf()
 )
 
-interface ProductRepository: PagingAndSortingRepository<Product, String> {
+interface ProductRepository: CrudRepository<Product, String> {
     @Query("SELECT max(p.publishedHub) from Product p")
     fun getMaxPublishedHub(): LocalDateTime?
     @Query("SELECT p FROM Product p WHERE p.publishedHub BETWEEN ?1 AND ?2 ORDER BY p.publishedHub")

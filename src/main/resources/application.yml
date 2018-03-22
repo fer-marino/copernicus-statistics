@@ -17,12 +17,13 @@ wamp:
   dhusUser: test
   dhusPassword: test
   dhusUrl: https://scihub.copernicus.eu/apihub
-  pollInterval: 18m
+  dhusIngestedFrom: 2018-02-01T00:00:00
+  pollInterval: 9m
   filter:
   extra:
   connectionTimeout: 200000
   readTimeout: 200000
-  autoStart: false
+  autoStart: true
   reindex: false
   upsert: true
   odaInbox: C:/Users/fernando marino/Desktop/report-dhus-oda
@@ -38,7 +39,7 @@ spring:
     url: jdbc:h2:file:C:/Users/fernando marino/Desktop/report-dhus-oda/statistics
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: none # not use default! defeault is create drop
 
 
 

@@ -2,7 +2,7 @@ buildscript {
 	ext {
 		kotlinVersion = '1.2.30'
 		springBootVersion = '2.0.0.RELEASE'
-		camelVersion = '2.20.2'
+		camelVersion = '2.21.0'
         elasticsearchVersion = '6.1.2'
 	}
 	repositories {

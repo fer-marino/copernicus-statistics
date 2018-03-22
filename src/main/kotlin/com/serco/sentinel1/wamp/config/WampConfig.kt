@@ -8,6 +8,7 @@ open class WampConfig {
     var dhusUser: String = ""
     var dhusPassword: String = ""
     var dhusUrl: String = ""
+    var dhusIngestedFrom: String = ""
     var connectionTimeout: Int = 30000
     var readTimeout: Int = 30000
     var extra: String = ""
