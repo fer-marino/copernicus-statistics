@@ -20,6 +20,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.logging.Logger
 import java.util.regex.Pattern
 
@@ -32,6 +34,10 @@ class DhusPolling : RouteBuilder() {
     @Autowired lateinit var productRepository: ProductRepository
 
     private var running = AtomicBoolean(false)
+    private var counter = AtomicInteger(0)
+    private var lastCount = AtomicInteger(0)
+    private var lastTime = AtomicLong(0)
+
     private var logger: Logger = Logger.getLogger("DhusPolling")
 
     private val restTemplate: RestTemplate by lazy {
@@ -58,7 +64,7 @@ class DhusPolling : RouteBuilder() {
         from("seda:query-dhus").routeId("query-dhus")
                 .setHeader(Exchange.HTTP_URI, simple("${wampConfig.dhusUrl}/odata/v1/Products?\$orderby=IngestionDate asc"
                         + "&\$format=json&\$top=100&\$skip=\${header.skip}&\$filter=\${header.filter}"))
-                .log("Polling ${wampConfig.dhusUrl}. Skipping first \${header.skip} records")
+                //.log("Polling ${wampConfig.dhusUrl}. Skipping first \${header.skip} records")
                 .setHeader("timeStart", simple("\${date:now}", Date::class.java))
                 .recipientList(simple("http://dummy?authUsername=${wampConfig.dhusUser}&authPassword=${wampConfig.dhusUser}" +
                         "&authMethod=Basic&httpClient.cookiePolicy=ignoreCookies&httpClient.authenticationPreemptive=true${wampConfig.extra}&httpClient.soTimeout=500000"))
@@ -99,7 +105,16 @@ class DhusPolling : RouteBuilder() {
                                     )
 
                             productRepository.save(prod)
+                            counter.incrementAndGet()
                         }
+
+
+                    }
+
+                    if(System.currentTimeMillis() - lastTime.get() > 60000) {
+                        log.info("Ingested $counter products with an ingestor rate of ${(counter.get() - lastCount.get()) / (System.currentTimeMillis()/1000 - lastTime.get()/1000)} prod/sec")
+                        lastTime.set(System.currentTimeMillis())
+                        lastCount.set(counter.get())
                     }
 
                     exchange.out = exchange.`in`.copy()
@@ -113,6 +128,7 @@ class DhusPolling : RouteBuilder() {
                 .choice().`when`(and(header("productNumber").isEqualTo(100), header("skip").isLessThan(10000)) )
                     .to("seda:query-dhus")
                 .otherwise().process {
+                    log.info("Scanning completed completed in ${(System.currentTimeMillis() - it.`in`.headers["processingStart"] as Long)/1000} sec")
                     running.set(false)
                 }
 
@@ -139,8 +155,10 @@ class DhusPolling : RouteBuilder() {
                     exchange.out.setHeader("filter", "substringof('S1', Name) and IngestionDate gt datetime'${sdf.format(last)}'")
                     exchange.out.setHeader("skip", 0)
                     exchange.out.setHeader("ingestionStart", sdf.format(last))
+                    exchange.out.setHeader("processingStart", System.currentTimeMillis())
                 }.choice().`when`(header("kill").isNotEqualTo(true))
                     .log("Polling dhus start at offset \${header.ingestionStart}").to("seda:query-dhus")
+                    .process { lastTime.set(System.currentTimeMillis()) }
 
     }
 
